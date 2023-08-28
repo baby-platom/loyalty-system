@@ -29,5 +29,9 @@ func Run() error {
 	authRouter.HandleFunc("/orders", UploadOrderAPIHandler).Methods(http.MethodPost)
 	authRouter.HandleFunc("/orders", ListUploadedOrdersAPIHandler).Methods(http.MethodGet)
 
+	authRouter.HandleFunc("/balance", GetBalanceAPIHandler).Methods(http.MethodGet)
+	authRouter.HandleFunc("/balance/withdraw", RequestWithdrawAPIHandler).Methods(http.MethodPost)
+	authRouter.HandleFunc("/withdrawals", ListWithdrawalsAPIHandler).Methods(http.MethodGet)
+
 	return http.ListenAndServe(config.Config.Address, router)
 }

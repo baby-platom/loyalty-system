@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type usedDataStruct struct {
+type userDataStruct struct {
 	Login    string `json:"login"`
 	Password string `json:"password"`
 }
@@ -35,7 +35,7 @@ func returnAuthCookie(w http.ResponseWriter, login string) {
 	}
 }
 
-func parseUserData(w http.ResponseWriter, r *http.Request, userData *usedDataStruct) bool {
+func parseUserData(w http.ResponseWriter, r *http.Request, userData *userDataStruct) bool {
 	if err := json.NewDecoder(r.Body).Decode(userData); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return true
@@ -50,7 +50,7 @@ func parseUserData(w http.ResponseWriter, r *http.Request, userData *usedDataStr
 }
 
 func UserRegisterAPIHandler(w http.ResponseWriter, r *http.Request) {
-	var userData usedDataStruct
+	var userData userDataStruct
 	if parseUserData(w, r, &userData) {
 		return
 	}
@@ -83,7 +83,7 @@ func reactToIncorrectLoginCredentials(w http.ResponseWriter) {
 }
 
 func UserLoginAPIHandler(w http.ResponseWriter, r *http.Request) {
-	var userData usedDataStruct
+	var userData userDataStruct
 	if parseUserData(w, r, &userData) {
 		return
 	}

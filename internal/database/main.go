@@ -27,7 +27,7 @@ func Prepare() {
 		logger.Log.Error("cannot open db", zap.Error(err))
 	}
 
-	err = DB.AutoMigrate(User{}, Order{})
+	err = DB.AutoMigrate(User{}, Order{}, Withdraw{})
 	if err != nil {
 		logger.Log.Error("cannot perform migration", zap.Error(err))
 	}
