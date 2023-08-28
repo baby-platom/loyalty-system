@@ -11,6 +11,7 @@ import (
 
 func main() {
 	config.ParseFlags()
+	logger.Log.Debugln(config.Config)
 	if err := logger.Initialize(config.Config.LogLevel); err != nil {
 		panic(err)
 	}
