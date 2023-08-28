@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/baby-platom/loyalty-system/internal/accrual"
 	"github.com/baby-platom/loyalty-system/internal/auth"
@@ -55,23 +58,33 @@ func fillUserByLogin(user *database.User, userLogin string) (err error) {
 }
 
 // Luhn validates the provided data using the Luhn algorithm.
-func Luhn(s []byte) bool {
-	n := len(s)
-	number := 0
-	result := 0
-	for i := 0; i < n; i++ {
-		number = int(s[i]) - '0'
-		if i%2 != 0 {
-			result += number
-			continue
-		}
-		number *= 2
-		if number > 9 {
-			number -= 9
-		}
-		result += number
+func Luhn(number string) bool {
+	digits := strings.Split(strings.ReplaceAll(number, " ", ""), "")
+	lengthOfString := len(digits)
+
+	if lengthOfString < 2 {
+		return false
 	}
-	return result%10 == 0
+
+	sum := 0
+	flag := false
+
+	for i := lengthOfString - 1; i > -1; i-- {
+		digit, _ := strconv.Atoi(digits[i])
+
+		if flag {
+			digit *= 2
+
+			if digit > 9 {
+				digit -= 9
+			}
+		}
+
+		sum += digit
+		flag = !flag
+	}
+
+	return math.Mod(float64(sum), 10) == 0
 }
 
 func fillUserByRequestWithToken(r *http.Request) (user database.User, err error) {

@@ -28,7 +28,7 @@ func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !Luhn([]byte(withdraw.Order)) {
+	if !Luhn(withdraw.Order) {
 		http.Error(w, "incorrect order number", http.StatusUnprocessableEntity)
 		return
 	}

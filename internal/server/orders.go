@@ -18,16 +18,17 @@ func UploadOrderAPIHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if strings.TrimSpace(string(body)) == "" {
+
+	orderNumber := string(body)
+	if strings.TrimSpace(orderNumber) == "" {
 		http.Error(w, "body is empty", http.StatusBadRequest)
 		return
 	}
 
-	if !Luhn(body) {
+	if !Luhn(orderNumber) {
 		http.Error(w, "incorrect order number", http.StatusUnprocessableEntity)
 		return
 	}
-	orderNumber := string(body)
 
 	userLogin := auth.GetUserLogin(r)
 	var user database.User
