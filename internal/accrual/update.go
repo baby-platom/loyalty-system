@@ -29,16 +29,14 @@ func GetOrdersCopyWithUpdatedFields(orders []database.Order) (ordersCopy []datab
 	ordersCopy = make([]database.Order, len(orders))
 	copy(ordersCopy, orders)
 
-	if config.Config.Local {
-		var wg sync.WaitGroup
-		for i, orderCopy := range ordersCopy {
-			if orderCopy.Status == database.NEW || orderCopy.Status == database.PROCESSING {
-				wg.Add(1)
-				go updateOrderCopy(orderCopy, orders[i], &ordersCopy, &changed, &wg)
-			}
+	var wg sync.WaitGroup
+	for i, orderCopy := range ordersCopy {
+		if orderCopy.Status == database.NEW || orderCopy.Status == database.PROCESSING {
+			wg.Add(1)
+			go updateOrderCopy(orderCopy, orders[i], &ordersCopy, &changed, &wg)
 		}
-		wg.Wait()
 	}
+	wg.Wait()
 	return
 }
 
