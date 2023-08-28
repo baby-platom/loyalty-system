@@ -3,7 +3,6 @@ package accrual
 import (
 	"sync"
 
-	"github.com/baby-platom/loyalty-system/internal/config"
 	"github.com/baby-platom/loyalty-system/internal/database"
 )
 
