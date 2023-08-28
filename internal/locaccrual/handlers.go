@@ -9,7 +9,7 @@ import (
 
 func OrderInfoAPIHandler(w http.ResponseWriter, r *http.Request) {
 	order := mux.Vars(r)["number"]
-	status := getRandomHttpStatus()
+	status := getRandomHTTPStatus()
 	if status != http.StatusOK {
 		w.WriteHeader(status)
 		return

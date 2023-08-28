@@ -33,21 +33,21 @@ func init() {
 	}
 }
 
-func getRandomHttpStatus() int {
+func getRandomHTTPStatus() int {
 	return httpStatusOptions[r.Intn(len(httpStatusOptions))]
 }
 
 type OrderInfo struct {
 	Order   string      `json:"order"`
 	Status  OrderStatus `json:"status"`
-	Accrual float64     `json:"accrual,omitempty"`
+	Accrual float32     `json:"accrual,omitempty"`
 }
 
 func getRandomOrderInfo(order string) (orderInfo OrderInfo) {
 	orderInfo.Order = order
 	orderInfo.Status = orderStatusOptions[r.Intn(len(orderStatusOptions))]
 	if orderInfo.Status == PROCESSED {
-		orderInfo.Accrual = float64(minAccrual + r.Intn(maxAccrual))
+		orderInfo.Accrual = float32(minAccrual + r.Intn(maxAccrual))
 	}
 	return orderInfo
 }

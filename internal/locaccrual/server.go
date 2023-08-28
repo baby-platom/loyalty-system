@@ -11,10 +11,10 @@ const LocalAccrualAdress = "localhost:8081"
 
 func Run() error {
 	router := mux.NewRouter()
-	ordersApiRouter := router.PathPrefix("/api").PathPrefix("/orders").Subrouter()
-	ordersApiRouter.Use(logger.Middleware)
+	ordersAPIRouter := router.PathPrefix("/api").PathPrefix("/orders").Subrouter()
+	ordersAPIRouter.Use(logger.Middleware)
 
-	ordersApiRouter.HandleFunc("/{number}", OrderInfoAPIHandler)
+	ordersAPIRouter.HandleFunc("/{number}", OrderInfoAPIHandler)
 
 	return http.ListenAndServe(LocalAccrualAdress, router)
 }

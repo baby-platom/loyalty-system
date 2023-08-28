@@ -103,8 +103,8 @@ func updateOrdersAccrual(r *http.Request, userID uint, logger *zap.SugaredLogger
 }
 
 type Balance struct {
-	Accumulated float64 `json:"current"`
-	Withdrawn   float64 `json:"withdrawn"`
+	Accumulated float32 `json:"current"`
+	Withdrawn   float32 `json:"withdrawn"`
 }
 
 func calculateBalance(userID uint, orders []database.Order) (balance Balance, err error) {
@@ -114,12 +114,12 @@ func calculateBalance(userID uint, orders []database.Order) (balance Balance, er
 		return balance, res.Error
 	}
 
-	var withdrawn float64
+	var withdrawn float32
 	for _, withdraw := range withdrawals {
 		withdrawn += withdraw.Sum
 	}
 
-	var accumulated float64
+	var accumulated float32
 	for _, order := range orders {
 		accumulated += order.Accrual
 	}

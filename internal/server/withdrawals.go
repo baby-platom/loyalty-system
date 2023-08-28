@@ -2,18 +2,16 @@ package server
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/baby-platom/loyalty-system/internal/database"
 	"github.com/baby-platom/loyalty-system/internal/logger"
-	"gorm.io/gorm"
 )
 
 type withdrawDataStruct struct {
 	Order string  `json:"order"`
-	Sum   float64 `json:"sum"`
+	Sum   float32 `json:"sum"`
 }
 
 func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
@@ -106,11 +104,12 @@ func ListWithdrawalsAPIHandler(w http.ResponseWriter, r *http.Request) {
 	var withdrawals []database.Withdraw
 	filter := database.Order{UserID: user.ID}
 	if res := database.DB.Where(&filter).Find(&withdrawals); res.Error != nil {
-		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
 		defaultReactionToInternalServerError(w, logger.Log, err)
+		return
+	}
+
+	if len(withdrawals) == 0 {
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 

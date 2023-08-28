@@ -13,7 +13,7 @@ import (
 type OrderData struct {
 	Number  string  `json:"number"`
 	Status  string  `json:"status"`
-	Accrual float64 `json:"accrual"`
+	Accrual float32 `json:"accrual"`
 }
 
 var client = resty.New()

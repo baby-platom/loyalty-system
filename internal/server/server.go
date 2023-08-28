@@ -13,14 +13,14 @@ import (
 
 func Run() error {
 	router := mux.NewRouter()
-	userApiRouter := router.PathPrefix("/api").PathPrefix("/user").Subrouter()
-	userApiRouter.Use(logger.Middleware)
-	userApiRouter.Use(compress.Middleware)
-	userApiRouter.Use(jsonContentTypeMiddleware)
-	userApiRouter.Use(middleware.Compress(5))
+	userAPIRouter := router.PathPrefix("/api").PathPrefix("/user").Subrouter()
+	userAPIRouter.Use(logger.Middleware)
+	userAPIRouter.Use(compress.Middleware)
+	userAPIRouter.Use(jsonContentTypeMiddleware)
+	userAPIRouter.Use(middleware.Compress(5))
 
-	noAuthRouter := userApiRouter.Methods(http.MethodPost).Subrouter()
-	authRouter := userApiRouter.Methods(http.MethodPost, http.MethodGet).Subrouter()
+	noAuthRouter := userAPIRouter.Methods(http.MethodPost).Subrouter()
+	authRouter := userAPIRouter.Methods(http.MethodPost, http.MethodGet).Subrouter()
 	authRouter.Use(auth.Middleware)
 
 	noAuthRouter.HandleFunc("/register", UserRegisterAPIHandler)
