@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/binary"
 	"io"
 	"net/http"
 	"strings"
@@ -28,7 +27,7 @@ func UploadOrderAPIHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "incorrect order number", http.StatusUnprocessableEntity)
 		return
 	}
-	orderNumber := int(binary.BigEndian.Uint64(body))
+	orderNumber := string(body)
 
 	userLogin := auth.GetUserLogin(r)
 	var user database.User

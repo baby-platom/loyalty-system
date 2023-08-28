@@ -32,7 +32,7 @@ const (
 
 type Order struct {
 	CustomBaseModel
-	Number    int         `json:"number" gorm:"not null;unique;default:null"`
+	Number    string      `json:"number" gorm:"not null;unique;default:null"`
 	Status    OrderStatus `json:"status" gorm:"default:NEW"`
 	Accrual   float64     `json:"accrual,omitempty"`
 	UserID    uint        `json:"-"`

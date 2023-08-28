@@ -3,10 +3,9 @@ package accrual
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/baby-platom/loyalty-system/internal/config"
-	"github.com/baby-platom/loyalty-system/internal/local_accrual"
+	"github.com/baby-platom/loyalty-system/internal/locaccrual"
 	"github.com/baby-platom/loyalty-system/internal/logger"
 	"github.com/go-resty/resty/v2"
 )
@@ -22,18 +21,18 @@ var address = config.Config.AccrualSystemAdress
 
 func PrepareAddress() {
 	if config.Config.Local {
-		address = fmt.Sprintf("http://%s", local_accrual.LocalAccrualAdress)
+		address = fmt.Sprintf("http://%s", locaccrual.LocalAccrualAdress)
 	}
 }
 
-func GetInfoAboutOrder(number int) (result OrderData, err error) {
+func GetInfoAboutOrder(number string) (result OrderData, err error) {
 	resp, err := client.
-		SetHostURL(address).
+		SetBaseURL(address).
 		R().
 		SetResult(&result).
 		SetPathParams(
 			map[string]string{
-				"orderNumber": strconv.Itoa(number),
+				"orderNumber": number,
 			},
 		).
 		Get("/api/orders/{orderNumber}")

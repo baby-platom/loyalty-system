@@ -1,4 +1,4 @@
-package local_accrual
+package locaccrual
 
 import (
 	"net/http"
