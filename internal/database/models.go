@@ -41,7 +41,7 @@ type Order struct {
 
 type Withdraw struct {
 	CustomBaseModel
-	Order     int       `json:"order" gorm:"not null;unique;default:null"`
+	Order     string    `json:"order" gorm:"not null;unique;default:null"`
 	Sum       float32   `json:"sum" gorm:"not null;default:null"`
 	UserID    uint      `json:"-"`
 	CreatedAt time.Time `json:"processed_at"`

@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/baby-platom/loyalty-system/internal/database"
 	"github.com/baby-platom/loyalty-system/internal/logger"
@@ -61,8 +60,7 @@ func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orderInt, _ := strconv.Atoi(withdraw.Order)
-	newWithdraw := database.Withdraw{Order: orderInt, Sum: withdraw.Sum}
+	newWithdraw := database.Withdraw{Order: withdraw.Order, Sum: withdraw.Sum}
 	user.Withdrawals = append(user.Withdrawals, newWithdraw)
 	if err = database.DB.Save(user).Error; err != nil {
 		defaultReactionToInternalServerError(w, logger.Log, err)
