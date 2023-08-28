@@ -17,12 +17,14 @@ type OrderData struct {
 }
 
 var client = resty.New()
-var address = config.Config.AccrualSystemAdress
+var address string
 
 func PrepareAddress() {
 	if config.Config.Local {
 		address = fmt.Sprintf("http://%s", locaccrual.LocalAccrualAdress)
+		return
 	}
+	address = config.Config.AccrualSystemAdress
 }
 
 func GetInfoAboutOrder(number string) (result OrderData, err error) {
