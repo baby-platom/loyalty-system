@@ -6,7 +6,7 @@ import (
 	"github.com/baby-platom/loyalty-system/internal/database"
 )
 
-func updateOrderCopy(orderCopy database.Order, order database.Order, ordersCopy *[]database.Order, changed *bool, wg *sync.WaitGroup) {
+func updateOrderCopy(i int, orderCopy database.Order, order database.Order, ordersCopy *[]database.Order, changed *bool, wg *sync.WaitGroup) {
 	orderData, err := GetInfoAboutOrder(orderCopy.Number)
 	if err == nil && orderData != (OrderData{}) {
 		orderCopy.Status = OrderStatusByAccrual[orderData.Status]
@@ -20,7 +20,7 @@ func updateOrderCopy(orderCopy database.Order, order database.Order, ordersCopy 
 		}
 	}
 
-	*ordersCopy = append(*ordersCopy, orderCopy)
+	(*ordersCopy)[i] = orderCopy
 	wg.Done()
 }
 
@@ -32,7 +32,7 @@ func GetOrdersCopyWithUpdatedFields(orders []database.Order) (ordersCopy []datab
 	for i, orderCopy := range ordersCopy {
 		if orderCopy.Status == database.NEW || orderCopy.Status == database.PROCESSING {
 			wg.Add(1)
-			go updateOrderCopy(orderCopy, orders[i], &ordersCopy, &changed, &wg)
+			go updateOrderCopy(i, orderCopy, orders[i], &ordersCopy, &changed, &wg)
 		}
 	}
 	wg.Wait()
