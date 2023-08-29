@@ -55,7 +55,7 @@ func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if available := (balance.Accumulated - balance.Withdrawn); available < withdraw.Sum {
+	if balance.Current < withdraw.Sum {
 		w.WriteHeader(http.StatusPaymentRequired)
 		return
 	}
