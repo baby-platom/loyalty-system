@@ -39,7 +39,7 @@ func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orders, status, err := updateOrdersAccrual(r, user.ID, logger.Log)
+	orders, status, err := getUserOrders(r, user.ID, logger.Log)
 	switch status {
 	case http.StatusInternalServerError:
 		defaultReactionToInternalServerError(w, logger.Log, err)
@@ -76,7 +76,7 @@ func GetBalanceAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orders, status, err := updateOrdersAccrual(r, user.ID, logger.Log)
+	orders, status, err := getUserOrders(r, user.ID, logger.Log)
 	if status == http.StatusInternalServerError {
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return

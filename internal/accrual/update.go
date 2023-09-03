@@ -1,42 +1,74 @@
 package accrual
 
 import (
-	"sync"
-
 	"github.com/baby-platom/loyalty-system/internal/database"
+	"github.com/baby-platom/loyalty-system/internal/logger"
+	"go.uber.org/zap"
 )
 
-func updateOrderCopy(i int, orderCopy database.Order, order database.Order, ordersCopy *[]database.Order, changed *bool, wg *sync.WaitGroup) {
-	orderData, err := GetInfoAboutOrder(orderCopy.Number)
-	if err == nil && orderData != (OrderData{}) {
-		orderCopy.Status = OrderStatusByAccrual[orderData.Status]
-		if orderCopy.Status == database.PROCESSED {
-			orderCopy.Accrual = orderData.Accrual
-			*changed = true
-		}
-
-		if order.Status != orderCopy.Status {
-			*changed = true
-		}
-	}
-
-	(*ordersCopy)[i] = orderCopy
-	wg.Done()
+type UpdatedOrder struct {
+	order   database.Order
+	changed bool
 }
 
-func GetOrdersCopyWithUpdatedFields(orders []database.Order) (ordersCopy []database.Order, changed bool) {
-	ordersCopy = make([]database.Order, len(orders))
-	copy(ordersCopy, orders)
+func getUpdatedOrder(order database.Order) chan UpdatedOrder {
+	out := make(chan UpdatedOrder)
 
-	var wg sync.WaitGroup
-	for i, orderCopy := range ordersCopy {
-		if orderCopy.Status == database.NEW || orderCopy.Status == database.PROCESSING {
-			wg.Add(1)
-			go updateOrderCopy(i, orderCopy, orders[i], &ordersCopy, &changed, &wg)
+	go func() {
+		defer close(out)
+
+		orderCopy := order
+		changed := false
+		orderData, err := GetInfoAboutOrder(orderCopy.Number)
+		if err == nil && orderData != (OrderData{}) {
+			orderCopy.Status = OrderStatusByAccrual[orderData.Status]
+			if orderCopy.Status == database.PROCESSED {
+				orderCopy.Accrual = orderData.Accrual
+				changed = true
+			}
+
+			if order.Status != orderCopy.Status {
+				changed = true
+			}
+		}
+
+		out <- UpdatedOrder{order: orderCopy, changed: changed}
+	}()
+
+	return out
+}
+
+func UpdateOrders() {
+	var orders []database.Order
+	res := database.DB.Where(database.Order{Status: database.NEW}).
+		Or(database.Order{Status: database.PROCESSING}).
+		Find(&orders)
+
+	if res.Error != nil {
+		logger.Log.Error("error while getting orders to update", zap.Error(res.Error))
+		return
+	}
+
+	outChannels := make([]chan UpdatedOrder, 0)
+
+	for _, order := range orders {
+		outChan := getUpdatedOrder(order)
+		outChannels = append(outChannels, outChan)
+	}
+
+	finalCh := make(chan UpdatedOrder)
+	fanIn(finalCh, outChannels...)
+
+	ordersToUpdate := make([]database.Order, 0)
+	for updatedOrder := range finalCh {
+		if updatedOrder.changed {
+			ordersToUpdate = append(ordersToUpdate, updatedOrder.order)
 		}
 	}
-	wg.Wait()
-	return
+
+	if err := UpdateOrdersObjects(ordersToUpdate); err != nil {
+		logger.Log.Error("error while getting orders to update", zap.Error(err))
+	}
 }
 
 func UpdateOrdersObjects(orders []database.Order) (err error) {
@@ -48,17 +80,20 @@ func UpdateOrdersObjects(orders []database.Order) (err error) {
 	}()
 
 	if err = tx.Error; err != nil {
+		logger.Log.Error(err)
 		return
 	}
 
 	for _, order := range orders {
 		if err = tx.Save(order).Error; err != nil {
+			logger.Log.Error(err)
 			tx.Rollback()
 			return
 		}
 	}
 
 	if err = tx.Commit().Error; err != nil {
+		logger.Log.Error(err)
 		return
 	}
 	return

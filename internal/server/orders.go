@@ -72,7 +72,7 @@ func ListUploadedOrdersAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orders, status, err := updateOrdersAccrual(r, user.ID, logger.Log)
+	orders, status, err := getUserOrders(r, user.ID, logger.Log)
 	switch status {
 	case http.StatusNoContent:
 		w.WriteHeader(status)

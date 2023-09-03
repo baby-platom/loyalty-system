@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/baby-platom/loyalty-system/internal/accrual"
 	"github.com/baby-platom/loyalty-system/internal/auth"
 	"github.com/baby-platom/loyalty-system/internal/database"
 	"go.uber.org/zap"
@@ -95,24 +94,17 @@ func fillUserByRequestWithToken(r *http.Request) (user database.User, err error)
 	return
 }
 
-func updateOrdersAccrual(r *http.Request, userID uint, logger *zap.SugaredLogger) (ordersCopy []database.Order, status int, err error) {
+func getUserOrders(r *http.Request, userID uint, logger *zap.SugaredLogger) (orders []database.Order, status int, err error) {
 	filter := database.Order{UserID: userID}
-	var orders []database.Order
 	if res := database.DB.Where(&filter).Find(&orders); res.Error != nil {
-		return ordersCopy, http.StatusInternalServerError, res.Error
+		return orders, http.StatusInternalServerError, res.Error
 	}
 
 	if len(orders) == 0 {
-		return ordersCopy, http.StatusNoContent, nil
+		return orders, http.StatusNoContent, nil
 	}
 
-	ordersCopy, changed := accrual.GetOrdersCopyWithUpdatedFields(orders)
-	if changed {
-		if err = accrual.UpdateOrdersObjects(ordersCopy); err != nil {
-			return ordersCopy, http.StatusInternalServerError, err
-		}
-	}
-	return ordersCopy, http.StatusOK, nil
+	return orders, http.StatusOK, nil
 }
 
 type Balance struct {

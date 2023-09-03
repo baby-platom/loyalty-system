@@ -3,7 +3,6 @@ package config
 import (
 	"flag"
 	"os"
-	"strconv"
 )
 
 // Config includes variables parsed from flags
@@ -13,10 +12,9 @@ var Config struct {
 	AccrualSystemAdress string
 	LogLevel            string
 	AuthSecretKey       string
-	Local               bool
 }
 
-// ParseFlags parses flags into the Config
+// ParseFlags parses flags and envs into the Config
 func ParseFlags() {
 	flag.StringVar(&Config.Address, "a", ":8080", "address and port to run server")
 	flag.StringVar(&Config.DatabaseURI, "d", "", "database connection uri")
@@ -37,11 +35,5 @@ func ParseFlags() {
 	Config.AuthSecretKey = "unsecureSecretKey"
 	if authSecretKey := os.Getenv("AUTH_SECRET_KEY"); authSecretKey != "" {
 		Config.AuthSecretKey = authSecretKey
-	}
-	if local := os.Getenv("LOCAL"); local != "" {
-		localBool, err := strconv.ParseBool(local)
-		if err == nil {
-			Config.Local = localBool
-		}
 	}
 }

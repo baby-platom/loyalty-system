@@ -4,7 +4,6 @@ import (
 	"github.com/baby-platom/loyalty-system/internal/accrual"
 	"github.com/baby-platom/loyalty-system/internal/config"
 	"github.com/baby-platom/loyalty-system/internal/database"
-	"github.com/baby-platom/loyalty-system/internal/locaccrual"
 	"github.com/baby-platom/loyalty-system/internal/logger"
 	"github.com/baby-platom/loyalty-system/internal/server"
 )
@@ -15,18 +14,7 @@ func main() {
 		panic(err)
 	}
 	database.Prepare()
-	accrual.PrepareAddress()
+	accrual.Prepare()
 
-	if config.Config.Local {
-		logger.Log.Info("local accrual address in use")
-		go func() {
-			if err := locaccrual.Run(); err != nil {
-				panic(err)
-			}
-		}()
-	}
-
-	if err := server.Run(); err != nil {
-		panic(err)
-	}
+	server.Run()
 }

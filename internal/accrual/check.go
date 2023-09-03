@@ -1,11 +1,9 @@
 package accrual
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/baby-platom/loyalty-system/internal/config"
-	"github.com/baby-platom/loyalty-system/internal/locaccrual"
 	"github.com/baby-platom/loyalty-system/internal/logger"
 	"github.com/go-resty/resty/v2"
 )
@@ -19,11 +17,7 @@ type OrderData struct {
 var client = resty.New()
 var address string
 
-func PrepareAddress() {
-	if config.Config.Local {
-		address = fmt.Sprintf("http://%s", locaccrual.LocalAccrualAdress)
-		return
-	}
+func Prepare() {
 	address = config.Config.AccrualSystemAdress
 }
 
@@ -47,13 +41,13 @@ func GetInfoAboutOrder(number string) (result OrderData, err error) {
 	case http.StatusOK:
 		return result, nil
 	case http.StatusNoContent:
-		return
+		return OrderData{}, nil
 	case http.StatusTooManyRequests:
 		logger.Log.Info("too many requests to accrual service")
-		return
+		return OrderData{}, nil
 	case http.StatusInternalServerError:
 		logger.Log.Infof("internal server error occured in accrual service by address '%s'", address)
-		return
+		return OrderData{}, nil
 	}
 	return
 }
