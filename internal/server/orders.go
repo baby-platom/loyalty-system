@@ -9,6 +9,7 @@ import (
 	"github.com/baby-platom/loyalty-system/internal/auth"
 	"github.com/baby-platom/loyalty-system/internal/database"
 	"github.com/baby-platom/loyalty-system/internal/logger"
+	"github.com/baby-platom/loyalty-system/internal/luhn"
 	"gorm.io/gorm"
 )
 
@@ -26,14 +27,14 @@ func UploadOrderAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !CheckLuhn(orderNumber) {
+	if !luhn.CheckLuhn(orderNumber) {
 		http.Error(w, "incorrect order number", http.StatusUnprocessableEntity)
 		return
 	}
 
 	userID := auth.GetUserIDFromRequest(r)
 	var user database.User
-	if err := fillUserByID(&user, userID); err != nil {
+	if err := database.FillUserByID(&user, userID); err != nil {
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return
 	}
@@ -95,7 +96,7 @@ func ListUploadedOrdersAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orders, status, err := getUserOrders(r, user.ID, logger.Log)
+	orders, status, err := database.GetUserOrders(r, user.ID, logger.Log)
 	switch status {
 	case http.StatusNoContent:
 		w.WriteHeader(status)

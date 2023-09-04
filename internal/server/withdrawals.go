@@ -7,6 +7,8 @@ import (
 
 	"github.com/baby-platom/loyalty-system/internal/database"
 	"github.com/baby-platom/loyalty-system/internal/logger"
+	"github.com/baby-platom/loyalty-system/internal/luhn"
+	"github.com/baby-platom/loyalty-system/internal/reflect"
 	"gorm.io/gorm"
 )
 
@@ -55,13 +57,13 @@ func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if msg := checkIfOneStrcutFieldIsEmpty(withdraw); msg != "" {
+	if msg := reflect.CheckIfOneStrcutFieldIsEmpty(withdraw); msg != "" {
 		logger.Log.Error(msg)
 		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
 
-	if !CheckLuhn(withdraw.Order) {
+	if !luhn.CheckLuhn(withdraw.Order) {
 		http.Error(w, "incorrect order number", http.StatusUnprocessableEntity)
 		return
 	}
@@ -73,7 +75,7 @@ func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orders, status, err := getUserOrders(r, user.ID, logger.Log)
+	orders, status, err := database.GetUserOrders(r, user.ID, logger.Log)
 	switch status {
 	case http.StatusInternalServerError:
 		defaultReactionToInternalServerError(w, logger.Log, err)
@@ -83,7 +85,7 @@ func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	balance, err := getBalance(user.ID, orders)
+	balance, err := database.GetBalance(user.ID, orders)
 	if err != nil {
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return
@@ -110,13 +112,13 @@ func GetBalanceAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orders, status, err := getUserOrders(r, user.ID, logger.Log)
+	orders, status, err := database.GetUserOrders(r, user.ID, logger.Log)
 	if status == http.StatusInternalServerError {
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return
 	}
 
-	balance, err := getBalance(user.ID, orders)
+	balance, err := database.GetBalance(user.ID, orders)
 	if err != nil {
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return

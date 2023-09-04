@@ -9,6 +9,7 @@ import (
 	"github.com/baby-platom/loyalty-system/internal/auth"
 	"github.com/baby-platom/loyalty-system/internal/database"
 	"github.com/baby-platom/loyalty-system/internal/logger"
+	"github.com/baby-platom/loyalty-system/internal/reflect"
 	"gorm.io/gorm"
 )
 
@@ -42,7 +43,7 @@ func parseUserData(w http.ResponseWriter, r *http.Request) (userDataStruct, bool
 		return userData, false
 	}
 
-	if msg := checkIfOneStrcutFieldIsEmpty(userData); msg != "" {
+	if msg := reflect.CheckIfOneStrcutFieldIsEmpty(userData); msg != "" {
 		logger.Log.Error(msg)
 		http.Error(w, msg, http.StatusBadRequest)
 		return userData, false
