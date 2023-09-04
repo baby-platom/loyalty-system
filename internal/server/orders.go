@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -37,10 +38,25 @@ func UploadOrderAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tx, err := database.GetTransaction()
+	if err != nil {
+		defaultReactionToInternalServerError(w, logger.Log, err)
+		return
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(r.(string))
+			tx.Rollback()
+			defaultReactionToInternalServerError(w, logger.Log, err)
+		}
+	}()
+
 	var existingOrder database.Order
 	orderFilter := database.Order{Number: orderNumber}
 	var res *gorm.DB
-	if res = database.DB.Where(&orderFilter).Limit(1).Find(&existingOrder); res.Error != nil {
+	if res = tx.Where(&orderFilter).Limit(1).Find(&existingOrder); res.Error != nil {
+		tx.Rollback()
 		defaultReactionToInternalServerError(w, logger.Log, res.Error)
 		return
 	}
@@ -57,10 +73,17 @@ func UploadOrderAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 	newOrder := database.Order{Number: orderNumber}
 	user.Orders = append(user.Orders, newOrder)
-	if err = database.DB.Save(user).Error; err != nil {
+	if err = tx.Save(user).Error; err != nil {
+		tx.Rollback()
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return
 	}
+
+	if err = database.CommitTransaction(tx); err != nil {
+		defaultReactionToInternalServerError(w, logger.Log, err)
+		return
+	}
+
 	w.WriteHeader(http.StatusAccepted)
 }
 

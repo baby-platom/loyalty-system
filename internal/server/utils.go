@@ -137,35 +137,3 @@ func writeResponseData(w http.ResponseWriter, logger *zap.SugaredLogger, data an
 	}
 	return true
 }
-
-func createWithdrawAndUpdateBalance(user *database.User, newWithdraw database.Withdraw) (err error) {
-	tx, err := database.GetTransaction()
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New(r.(string))
-			tx.Rollback()
-		}
-	}()
-
-	user.Withdrawals = append(user.Withdrawals, newWithdraw)
-	if res := tx.Save(user); res.Error != nil {
-		tx.Rollback()
-		return res.Error
-	}
-
-	res := tx.Model(&database.Balance{}).Where(database.Balance{UserID: user.ID}).
-		Update("withdrawn", gorm.Expr("withdrawn + ?", newWithdraw.Sum))
-	if res.Error != nil {
-		tx.Rollback()
-		return res.Error
-	}
-
-	if err = database.CommitTransaction(tx); err != nil {
-		return err
-	}
-	return nil
-}

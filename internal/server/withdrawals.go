@@ -2,15 +2,49 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/baby-platom/loyalty-system/internal/database"
 	"github.com/baby-platom/loyalty-system/internal/logger"
+	"gorm.io/gorm"
 )
 
 type withdrawDataStruct struct {
 	Order string  `json:"order"`
 	Sum   float32 `json:"sum"`
+}
+
+func createWithdrawAndUpdateBalance(user *database.User, newWithdraw database.Withdraw) (err error) {
+	tx, err := database.GetTransaction()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(r.(string))
+			tx.Rollback()
+		}
+	}()
+
+	user.Withdrawals = append(user.Withdrawals, newWithdraw)
+	if res := tx.Save(user); res.Error != nil {
+		tx.Rollback()
+		return res.Error
+	}
+
+	res := tx.Model(&database.Balance{}).Where(database.Balance{UserID: user.ID}).
+		Update("withdrawn", gorm.Expr("withdrawn + ?", newWithdraw.Sum))
+	if res.Error != nil {
+		tx.Rollback()
+		return res.Error
+	}
+
+	if err = database.CommitTransaction(tx); err != nil {
+		return err
+	}
+	return nil
 }
 
 func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
