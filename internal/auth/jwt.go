@@ -11,16 +11,16 @@ import (
 
 type claims struct {
 	jwt.RegisteredClaims
-	Login string
+	ID uint
 }
 
 // BuildJWTString - creates and return a string representation of JWT token
-func BuildJWTString(login string) (string, error) {
+func BuildJWTString(id uint) (string, error) {
 	token := jwt.NewWithClaims(
 		jwt.SigningMethodHS256,
 		claims{
 			RegisteredClaims: jwt.RegisteredClaims{},
-			Login:            login,
+			ID:               id,
 		},
 	)
 
@@ -32,7 +32,7 @@ func BuildJWTString(login string) (string, error) {
 	return tokenString, nil
 }
 
-func GetLogin(tokenString string) (string, error) {
+func GetUserIDFromToken(tokenString string) (uint, error) {
 	claims := &claims{}
 	token, err := jwt.ParseWithClaims(
 		tokenString,
@@ -46,14 +46,14 @@ func GetLogin(tokenString string) (string, error) {
 	)
 
 	if err != nil {
-		return "", fmt.Errorf("error occured while parsing JWT token: %w", err)
+		return 0, fmt.Errorf("error occured while parsing JWT token: %w", err)
 	}
 
 	if !token.Valid {
 		logger.Log.Warn("Token is not valid")
-		return "", errors.New("token is not valid")
+		return 0, errors.New("token is not valid")
 	}
 
 	logger.Log.Info("Token is valid")
-	return claims.Login, nil
+	return claims.ID, nil
 }

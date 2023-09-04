@@ -1,9 +1,12 @@
 package accrual
 
 import (
+	"errors"
+
 	"github.com/baby-platom/loyalty-system/internal/database"
 	"github.com/baby-platom/loyalty-system/internal/logger"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type UpdatedOrder struct {
@@ -11,24 +14,34 @@ type UpdatedOrder struct {
 	changed bool
 }
 
-func getUpdatedOrder(order database.Order) chan UpdatedOrder {
+func getUpdatedOrder(cancelCh chan struct{}, order database.Order) chan UpdatedOrder {
 	out := make(chan UpdatedOrder)
 
 	go func() {
 		defer close(out)
-
 		orderCopy := order
 		changed := false
-		orderData, err := GetInfoAboutOrder(orderCopy.Number)
-		if err == nil && orderData != (OrderData{}) {
-			orderCopy.Status = OrderStatusByAccrual[orderData.Status]
-			if orderCopy.Status == database.PROCESSED {
-				orderCopy.Accrual = orderData.Accrual
-				changed = true
+
+		select {
+		case <-cancelCh:
+			break
+		default:
+			orderData, err := GetInfoAboutOrder(orderCopy.Number)
+			if errors.Is(err, tooManyRequestsError) {
+				close(cancelCh)
+				break
 			}
 
-			if order.Status != orderCopy.Status {
-				changed = true
+			if err == nil && orderData != (OrderData{}) {
+				orderCopy.Status = OrderStatusByAccrual[orderData.Status]
+				if orderCopy.Status == database.PROCESSED {
+					orderCopy.Accrual = orderData.Accrual
+					changed = true
+				}
+
+				if order.Status != orderCopy.Status {
+					changed = true
+				}
 			}
 		}
 
@@ -51,8 +64,9 @@ func UpdateOrders() {
 
 	outChannels := make([]chan UpdatedOrder, 0)
 
+	cancelCh := make(chan struct{})
 	for _, order := range orders {
-		outChan := getUpdatedOrder(order)
+		outChan := getUpdatedOrder(cancelCh, order)
 		outChannels = append(outChannels, outChan)
 	}
 
@@ -60,41 +74,66 @@ func UpdateOrders() {
 	fanIn(finalCh, outChannels...)
 
 	ordersToUpdate := make([]database.Order, 0)
+	ordersWithAccrual := make([]database.Order, 0)
 	for updatedOrder := range finalCh {
 		if updatedOrder.changed {
 			ordersToUpdate = append(ordersToUpdate, updatedOrder.order)
+			if updatedOrder.order.Accrual != 0 {
+				ordersWithAccrual = append(ordersWithAccrual, updatedOrder.order)
+			}
 		}
 	}
 
-	if err := UpdateOrdersObjects(ordersToUpdate); err != nil {
-		logger.Log.Error("error while getting orders to update", zap.Error(err))
+	if err := updateOrdersAndBalances(ordersToUpdate, ordersWithAccrual); err != nil {
+		logger.Log.Error("error while updating orders and balances", zap.Error(err))
 	}
 }
 
-func UpdateOrdersObjects(orders []database.Order) (err error) {
-	tx := database.DB.Begin()
+func updateOrdersAndBalances(ordersToUpdate, ordersWithAccrual []database.Order) (err error) {
+	tx, err := database.GetTransaction()
+	if err != nil {
+		return err
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
+			err = errors.New(r.(string))
 			tx.Rollback()
 		}
 	}()
 
-	if err = tx.Error; err != nil {
-		logger.Log.Error(err)
-		return
+	if err = updateOrders(tx, ordersToUpdate); err != nil {
+		tx.Rollback()
+		return err
 	}
 
-	for _, order := range orders {
-		if err = tx.Save(order).Error; err != nil {
+	if err = updateBalancecFromOrders(tx, ordersWithAccrual); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err = database.CommitTransaction(tx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func updateOrders(tx *gorm.DB, ordersToUpdate []database.Order) error {
+	for _, order := range ordersToUpdate {
+		if err := tx.Save(order).Error; err != nil {
 			logger.Log.Error(err)
-			tx.Rollback()
-			return
+			return err
 		}
 	}
+	return nil
+}
 
-	if err = tx.Commit().Error; err != nil {
-		logger.Log.Error(err)
-		return
+func updateBalancecFromOrders(tx *gorm.DB, ordersWithAccrual []database.Order) error {
+	for _, order := range ordersWithAccrual {
+		if err := updateBalanceFromOrder(tx, order); err != nil {
+			logger.Log.Error(err)
+			return err
+		}
 	}
-	return
+	return nil
 }

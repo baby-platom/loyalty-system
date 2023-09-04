@@ -25,7 +25,7 @@ func jsonContentTypeMiddleware(h http.Handler) http.Handler {
 	)
 }
 
-func checkIfOneStrcutFieldIsEmpty(s any) string {
+func checkIfOneStrcutFieldIsEmpty(s interface{}) string {
 	v := reflect.ValueOf(s)
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
@@ -47,8 +47,8 @@ func defaultReactionToEncodingResponseError(w http.ResponseWriter, logger *zap.S
 	http.Error(w, "Error encoding response", http.StatusInternalServerError)
 }
 
-func fillUserByLogin(user *database.User, userLogin string) (err error) {
-	userFilter := database.User{Login: userLogin}
+func fillUserByID(user *database.User, id uint) (err error) {
+	userFilter := database.User{CustomBaseModel: database.CustomBaseModel{ID: id}}
 	res := database.DB.Where(&userFilter).First(&user)
 	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
 		return res.Error
@@ -56,8 +56,8 @@ func fillUserByLogin(user *database.User, userLogin string) (err error) {
 	return err
 }
 
-// Luhn validates the provided data using the Luhn algorithm.
-func Luhn(number string) bool {
+// CheckLuhn validates the provided data using the Luhn algorithm.
+func CheckLuhn(number string) bool {
 	digits := strings.Split(strings.ReplaceAll(number, " ", ""), "")
 	lengthOfString := len(digits)
 
@@ -87,8 +87,8 @@ func Luhn(number string) bool {
 }
 
 func fillUserByRequestWithToken(r *http.Request) (user database.User, err error) {
-	userLogin := auth.GetUserLogin(r)
-	if err = fillUserByLogin(&user, userLogin); err != nil {
+	id := auth.GetUserIDFromRequest(r)
+	if err = fillUserByID(&user, id); err != nil {
 		return
 	}
 	return
@@ -112,25 +112,16 @@ type Balance struct {
 	Withdrawn float32 `json:"withdrawn"`
 }
 
-func calculateBalance(userID uint, orders []database.Order) (balance Balance, err error) {
-	filter := database.Withdraw{UserID: userID}
-	var withdrawals []database.Withdraw
-	if res := database.DB.Where(&filter).Find(&withdrawals); res.Error != nil {
+func getBalance(userID uint, orders []database.Order) (balance Balance, err error) {
+	filter := database.Balance{UserID: userID}
+	var balanceObject database.Balance
+
+	if res := database.DB.Where(&filter).First(&balanceObject); res.Error != nil {
 		return balance, res.Error
 	}
 
-	var withdrawn float32
-	for _, withdraw := range withdrawals {
-		withdrawn += withdraw.Sum
-	}
-
-	var accumulated float32
-	for _, order := range orders {
-		accumulated += order.Accrual
-	}
-
-	balance.Withdrawn = withdrawn
-	balance.Current = accumulated - withdrawn
+	balance.Withdrawn = balanceObject.Withdrawn
+	balance.Current = balanceObject.Accumulated - balanceObject.Withdrawn
 	return
 }
 
@@ -145,4 +136,36 @@ func writeResponseData(w http.ResponseWriter, logger *zap.SugaredLogger, data an
 		return
 	}
 	return true
+}
+
+func createWithdrawAndUpdateBalance(user *database.User, newWithdraw database.Withdraw) (err error) {
+	tx, err := database.GetTransaction()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(r.(string))
+			tx.Rollback()
+		}
+	}()
+
+	user.Withdrawals = append(user.Withdrawals, newWithdraw)
+	if res := tx.Save(user); res.Error != nil {
+		tx.Rollback()
+		return res.Error
+	}
+
+	res := tx.Model(&database.Balance{}).Where(database.Balance{UserID: user.ID}).
+		Update("withdrawn", gorm.Expr("withdrawn + ?", newWithdraw.Sum))
+	if res.Error != nil {
+		tx.Rollback()
+		return res.Error
+	}
+
+	if err = database.CommitTransaction(tx); err != nil {
+		return err
+	}
+	return nil
 }

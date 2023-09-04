@@ -7,9 +7,9 @@ import (
 )
 
 // ContentTypesToBeEncoded defince the content types to be encoded
-var ContentTypesToBeEncoded = []string{"application/json", "text/html"}
+var ContentTypesToBeDecoded = []string{"application/json", "text/html"}
 
-// Middleware for compression and decompression
+// Middleware for decompression
 func Middleware(h http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Content-Encoding") == "gzip" {

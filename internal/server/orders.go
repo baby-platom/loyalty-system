@@ -25,14 +25,14 @@ func UploadOrderAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !Luhn(orderNumber) {
+	if !CheckLuhn(orderNumber) {
 		http.Error(w, "incorrect order number", http.StatusUnprocessableEntity)
 		return
 	}
 
-	userLogin := auth.GetUserLogin(r)
+	userID := auth.GetUserIDFromRequest(r)
 	var user database.User
-	if err := fillUserByLogin(&user, userLogin); err != nil {
+	if err := fillUserByID(&user, userID); err != nil {
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return
 	}

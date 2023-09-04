@@ -19,6 +19,7 @@ type User struct {
 	PasswordHash string
 	Orders       []Order
 	Withdrawals  []Withdraw
+	Balance      Balance
 }
 
 type OrderStatus string
@@ -45,4 +46,11 @@ type Withdraw struct {
 	Sum       float32   `json:"sum" gorm:"not null;default:null"`
 	UserID    uint      `json:"-"`
 	CreatedAt time.Time `json:"processed_at"`
+}
+
+type Balance struct {
+	CustomBaseModel
+	Accumulated float32 `gorm:"not null;default:0"`
+	Withdrawn   float32 `gorm:"not null;default:0"`
+	UserID      uint
 }

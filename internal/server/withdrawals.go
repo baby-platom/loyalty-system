@@ -27,7 +27,7 @@ func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !Luhn(withdraw.Order) {
+	if !CheckLuhn(withdraw.Order) {
 		http.Error(w, "incorrect order number", http.StatusUnprocessableEntity)
 		return
 	}
@@ -49,7 +49,7 @@ func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	balance, err := calculateBalance(user.ID, orders)
+	balance, err := getBalance(user.ID, orders)
 	if err != nil {
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return
@@ -61,8 +61,8 @@ func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newWithdraw := database.Withdraw{Order: withdraw.Order, Sum: withdraw.Sum}
-	user.Withdrawals = append(user.Withdrawals, newWithdraw)
-	if err = database.DB.Save(user).Error; err != nil {
+	err = createWithdrawAndUpdateBalance(&user, newWithdraw)
+	if err != nil {
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return
 	}
@@ -82,7 +82,7 @@ func GetBalanceAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	balance, err := calculateBalance(user.ID, orders)
+	balance, err := getBalance(user.ID, orders)
 	if err != nil {
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return

@@ -7,11 +7,11 @@ import (
 	"github.com/baby-platom/loyalty-system/internal/logger"
 )
 
-type key int
+type key string
 
-const UserLogin key = 0
+const UserID key = "userID"
 
-// Middleware for compression and decompression
+// Middleware for authentification
 func Middleware(h http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		authCookie, err := r.Cookie("auth")
@@ -28,7 +28,7 @@ func Middleware(h http.Handler) http.Handler {
 			return
 		}
 
-		login, err := GetLogin(authCookie.Value)
+		id, err := GetUserIDFromToken(authCookie.Value)
 		if err != nil {
 			logger.Log.Warnw(
 				"Error occured while parsing auth cookie",
@@ -38,12 +38,12 @@ func Middleware(h http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), UserLogin, login)
+		ctx := context.WithValue(r.Context(), UserID, id)
 		h.ServeHTTP(w, r.WithContext(ctx))
 	}
 	return http.HandlerFunc(fn)
 }
 
-func GetUserLogin(r *http.Request) string {
-	return r.Context().Value(UserLogin).(string)
+func GetUserIDFromRequest(r *http.Request) uint {
+	return r.Context().Value(UserID).(uint)
 }

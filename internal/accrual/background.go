@@ -11,8 +11,8 @@ func UpdateOrdersInBackground() {
 
 	for {
 		<-ticker.C
-		logger.Log.Info("Updating orders")
+		logger.Log.Debug("Updating orders")
 		UpdateOrders()
-		logger.Log.Info("Updated orders")
+		logger.Log.Debug("Updated orders")
 	}
 }

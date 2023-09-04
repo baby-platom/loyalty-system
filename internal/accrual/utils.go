@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/baby-platom/loyalty-system/internal/database"
+	"gorm.io/gorm"
 )
 
 var OrderStatusByAccrual = map[string]database.OrderStatus{
@@ -33,4 +34,10 @@ func fanIn(finalCh chan UpdatedOrder, resultChs ...chan UpdatedOrder) {
 		wg.Wait()
 		close(finalCh)
 	}()
+}
+
+func updateBalanceFromOrder(tx *gorm.DB, order database.Order) error {
+	res := tx.Model(&database.Balance{}).Where(database.Balance{UserID: order.UserID}).
+		Update("accumulated", gorm.Expr("accumulated + ?", order.Accrual))
+	return res.Error
 }

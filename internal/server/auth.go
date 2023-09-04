@@ -17,8 +17,8 @@ type userDataStruct struct {
 	Password string `json:"password"`
 }
 
-func returnAuthCookie(w http.ResponseWriter, login string) {
-	newAuthToken, err := auth.BuildJWTString(login)
+func returnAuthCookie(w http.ResponseWriter, id uint) {
+	newAuthToken, err := auth.BuildJWTString(id)
 	if err == nil {
 		cookie := &http.Cookie{
 			Name:  "auth",
@@ -35,23 +35,24 @@ func returnAuthCookie(w http.ResponseWriter, login string) {
 	}
 }
 
-func parseUserData(w http.ResponseWriter, r *http.Request, userData *userDataStruct) bool {
-	if err := json.NewDecoder(r.Body).Decode(userData); err != nil {
+func parseUserData(w http.ResponseWriter, r *http.Request) (userDataStruct, bool) {
+	var userData userDataStruct
+	if err := json.NewDecoder(r.Body).Decode(&userData); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		return true
+		return userData, false
 	}
 
-	if msg := checkIfOneStrcutFieldIsEmpty(*userData); msg != "" {
+	if msg := checkIfOneStrcutFieldIsEmpty(userData); msg != "" {
 		logger.Log.Error(msg)
 		http.Error(w, msg, http.StatusBadRequest)
-		return true
+		return userData, false
 	}
-	return false
+	return userData, true
 }
 
 func UserRegisterAPIHandler(w http.ResponseWriter, r *http.Request) {
-	var userData userDataStruct
-	if parseUserData(w, r, &userData) {
+	userData, ok := parseUserData(w, r)
+	if !ok {
 		return
 	}
 
@@ -65,15 +66,27 @@ func UserRegisterAPIHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := database.User{Login: userData.Login, PasswordHash: hash}
 	res := database.DB.Create(&user)
-	if errors.Is(res.Error, gorm.ErrDuplicatedKey) {
-		msg := fmt.Sprintf("user with login '%s' already exists", userData.Login)
-		logger.Log.Error(msg)
-		http.Error(w, msg, http.StatusNoContent)
+
+	if res.Error != nil {
+		if errors.Is(res.Error, gorm.ErrDuplicatedKey) {
+			msg := fmt.Sprintf("user with login '%s' already exists", userData.Login)
+			logger.Log.Error(msg)
+			http.Error(w, msg, http.StatusNoContent)
+			return
+		}
+		defaultReactionToInternalServerError(w, logger.Log, res.Error)
+		return
+	}
+
+	balance := database.Balance{UserID: user.ID}
+	res = database.DB.Create(&balance)
+	if res.Error != nil {
+		defaultReactionToInternalServerError(w, logger.Log, res.Error)
 		return
 	}
 
 	logger.Log.Info("Creating new auth cookie")
-	returnAuthCookie(w, userData.Login)
+	returnAuthCookie(w, user.ID)
 }
 
 func reactToIncorrectLoginCredentials(w http.ResponseWriter) {
@@ -83,8 +96,8 @@ func reactToIncorrectLoginCredentials(w http.ResponseWriter) {
 }
 
 func UserLoginAPIHandler(w http.ResponseWriter, r *http.Request) {
-	var userData userDataStruct
-	if parseUserData(w, r, &userData) {
+	userData, ok := parseUserData(w, r)
+	if !ok {
 		return
 	}
 
@@ -102,5 +115,5 @@ func UserLoginAPIHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Log.Info("Creating new auth cookie")
-	returnAuthCookie(w, userData.Login)
+	returnAuthCookie(w, user.ID)
 }
