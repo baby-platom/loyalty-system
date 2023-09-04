@@ -17,7 +17,7 @@ type OrderData struct {
 
 var client = resty.New()
 var address string
-var tooManyRequestsError = errors.New("too many requests to accrual service")
+var errManyRequestsError = errors.New("too many requests to accrual service")
 
 func Prepare() {
 	address = config.Config.AccrualSystemAdress
@@ -46,7 +46,7 @@ func GetInfoAboutOrder(number string) (result OrderData, err error) {
 		return OrderData{}, nil
 	case http.StatusTooManyRequests:
 		logger.Log.Info("too many requests to accrual service")
-		return OrderData{}, tooManyRequestsError
+		return OrderData{}, errManyRequestsError
 	case http.StatusInternalServerError:
 		logger.Log.Infof("internal server error occured in accrual service by address '%s'", address)
 		return OrderData{}, nil

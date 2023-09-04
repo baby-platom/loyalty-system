@@ -27,7 +27,7 @@ func getUpdatedOrder(cancelCh chan struct{}, order database.Order) chan UpdatedO
 			break
 		default:
 			orderData, err := GetInfoAboutOrder(orderCopy.Number)
-			if errors.Is(err, tooManyRequestsError) {
+			if errors.Is(err, errManyRequestsError) {
 				close(cancelCh)
 				break
 			}
