@@ -1,6 +1,7 @@
 package accrual
 
 import (
+	"context"
 	"errors"
 
 	"github.com/baby-platom/loyalty-system/internal/database"
@@ -14,68 +15,59 @@ type UpdatedOrder struct {
 	changed bool
 }
 
-func getUpdatedOrder(cancelCh chan struct{}, order database.Order) chan UpdatedOrder {
-	out := make(chan UpdatedOrder)
+func getUpdatedOrder(outCh chan UpdatedOrder, cancelCh chan struct{}, order database.Order) {
+	orderCopy := order
+	changed := false
 
-	go func() {
-		defer close(out)
-		orderCopy := order
-		changed := false
-
-		select {
-		case <-cancelCh:
+	select {
+	case <-cancelCh:
+		break
+	default:
+		orderData, err := GetInfoAboutOrder(orderCopy.Number)
+		if errors.Is(err, errManyRequestsError) {
+			close(cancelCh)
 			break
-		default:
-			orderData, err := GetInfoAboutOrder(orderCopy.Number)
-			if errors.Is(err, errManyRequestsError) {
-				close(cancelCh)
-				break
-			}
-
-			if err == nil && orderData != (OrderData{}) {
-				orderCopy.Status = OrderStatusByAccrual[orderData.Status]
-				if orderCopy.Status == database.PROCESSED {
-					orderCopy.Accrual = orderData.Accrual
-					changed = true
-				}
-
-				if order.Status != orderCopy.Status {
-					changed = true
-				}
-			}
 		}
 
-		out <- UpdatedOrder{order: orderCopy, changed: changed}
-	}()
+		if err == nil && orderData != (OrderData{}) {
+			orderCopy.Status = OrderStatusByAccrual[orderData.Status]
+			if orderCopy.Status == database.PROCESSED {
+				orderCopy.Accrual = orderData.Accrual
+				changed = true
+			}
 
-	return out
+			if order.Status != orderCopy.Status {
+				changed = true
+			}
+		}
+	}
+
+	outCh <- UpdatedOrder{order: orderCopy, changed: changed}
 }
 
-func UpdateOrders() {
+func UpdateOrders(ctx context.Context) error {
 	var orders []database.Order
-	res := database.DB.Where(database.Order{Status: database.NEW}).
+	res := database.DB.Conn(ctx).Where(database.Order{Status: database.NEW}).
 		Or(database.Order{Status: database.PROCESSING}).
 		Find(&orders)
 
 	if res.Error != nil {
 		logger.Log.Error("error while getting orders to update", zap.Error(res.Error))
-		return
+		return res.Error
 	}
 
-	outChannels := make([]chan UpdatedOrder, 0)
-
+	outCh := make(chan UpdatedOrder)
 	cancelCh := make(chan struct{})
+	updatedOrdersCounter := 0
 	for _, order := range orders {
-		outChan := getUpdatedOrder(cancelCh, order)
-		outChannels = append(outChannels, outChan)
+		go getUpdatedOrder(outCh, cancelCh, order)
+		updatedOrdersCounter += 1
 	}
-
-	finalCh := make(chan UpdatedOrder)
-	fanIn(finalCh, outChannels...)
 
 	ordersToUpdate := make([]database.Order, 0)
 	ordersWithAccrual := make([]database.Order, 0)
-	for updatedOrder := range finalCh {
+	for i := 0; i < updatedOrdersCounter; i++ {
+		updatedOrder := <-outCh
 		if updatedOrder.changed {
 			ordersToUpdate = append(ordersToUpdate, updatedOrder.order)
 			if updatedOrder.order.Accrual != 0 {
@@ -84,56 +76,30 @@ func UpdateOrders() {
 		}
 	}
 
-	if err := updateOrdersAndBalances(ordersToUpdate, ordersWithAccrual); err != nil {
+	if err := updateOrdersAndBalances(ctx, ordersToUpdate, ordersWithAccrual); err != nil {
 		logger.Log.Error("error while updating orders and balances", zap.Error(err))
-	}
-}
-
-func updateOrdersAndBalances(ordersToUpdate, ordersWithAccrual []database.Order) (err error) {
-	tx, err := database.GetTransaction()
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New(r.(string))
-			tx.Rollback()
-		}
-	}()
-
-	if err = updateOrders(tx, ordersToUpdate); err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	if err = updateBalancecFromOrders(tx, ordersWithAccrual); err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	if err = database.CommitTransaction(tx); err != nil {
 		return err
 	}
 	return nil
 }
 
-func updateOrders(tx *gorm.DB, ordersToUpdate []database.Order) error {
+func updateOrdersAndBalances(ctx context.Context, ordersToUpdate, ordersWithAccrual []database.Order) error {
 	for _, order := range ordersToUpdate {
-		if err := tx.Save(order).Error; err != nil {
+		if err := database.DB.Conn(ctx).Save(order).Error; err != nil {
 			logger.Log.Error(err)
 			return err
 		}
 	}
-	return nil
-}
 
-func updateBalancecFromOrders(tx *gorm.DB, ordersWithAccrual []database.Order) error {
 	for _, order := range ordersWithAccrual {
-		if err := updateBalanceFromOrder(tx, order); err != nil {
-			logger.Log.Error(err)
-			return err
+		res := database.DB.Conn(ctx).Model(&database.Balance{}).Where(database.Balance{UserID: order.UserID}).
+			Update("accumulated", gorm.Expr("accumulated + ?", order.Accrual))
+
+		if res.Error != nil {
+			logger.Log.Error(res.Error)
+			return res.Error
 		}
 	}
+
 	return nil
 }

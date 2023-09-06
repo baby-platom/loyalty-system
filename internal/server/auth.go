@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -65,24 +66,23 @@ func UserRegisterAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := database.User{Login: userData.Login, PasswordHash: hash}
-	res := database.DB.Create(&user)
+	var user database.User
+	err = database.DB.WithinTransaction(
+		r.Context(),
+		func(ctx context.Context) error {
+			user, err = database.CreateUserWithBalance(r.Context(), userData.Login, hash)
+			return err
+		},
+	)
 
-	if res.Error != nil {
-		if errors.Is(res.Error, gorm.ErrDuplicatedKey) {
+	if err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			msg := fmt.Sprintf("user with login '%s' already exists", userData.Login)
 			logger.Log.Error(msg)
 			http.Error(w, msg, http.StatusNoContent)
 			return
 		}
-		defaultReactionToInternalServerError(w, logger.Log, res.Error)
-		return
-	}
-
-	balance := database.Balance{UserID: user.ID}
-	res = database.DB.Create(&balance)
-	if res.Error != nil {
-		defaultReactionToInternalServerError(w, logger.Log, res.Error)
+		defaultReactionToInternalServerError(w, logger.Log, err)
 		return
 	}
 
@@ -102,10 +102,8 @@ func UserLoginAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user database.User
-	userFilter := database.User{Login: userData.Login}
-	res := database.DB.Where(&userFilter).First(&user)
-	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+	user, err := database.GetUserByLogin(r.Context(), userData.Login)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		reactToIncorrectLoginCredentials(w)
 		return
 	}

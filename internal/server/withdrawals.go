@@ -1,52 +1,20 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 
+	"github.com/baby-platom/loyalty-system/internal/auth"
 	"github.com/baby-platom/loyalty-system/internal/database"
 	"github.com/baby-platom/loyalty-system/internal/logger"
 	"github.com/baby-platom/loyalty-system/internal/luhn"
 	"github.com/baby-platom/loyalty-system/internal/reflect"
-	"gorm.io/gorm"
 )
 
 type withdrawDataStruct struct {
 	Order string  `json:"order"`
 	Sum   float32 `json:"sum"`
-}
-
-func createWithdrawAndUpdateBalance(user *database.User, newWithdraw database.Withdraw) (err error) {
-	tx, err := database.GetTransaction()
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New(r.(string))
-			tx.Rollback()
-		}
-	}()
-
-	user.Withdrawals = append(user.Withdrawals, newWithdraw)
-	if res := tx.Save(user); res.Error != nil {
-		tx.Rollback()
-		return res.Error
-	}
-
-	res := tx.Model(&database.Balance{}).Where(database.Balance{UserID: user.ID}).
-		Update("withdrawn", gorm.Expr("withdrawn + ?", newWithdraw.Sum))
-	if res.Error != nil {
-		tx.Rollback()
-		return res.Error
-	}
-
-	if err = database.CommitTransaction(tx); err != nil {
-		return err
-	}
-	return nil
 }
 
 func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
@@ -68,36 +36,25 @@ func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var user database.User
-	user, err := fillUserByRequestWithToken(r)
+	userID := auth.GetUserIDFromRequest(r)
+	balanceData, err := database.GetBalanceDataByUserID(r.Context(), userID)
 	if err != nil {
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return
 	}
 
-	orders, status, err := database.GetUserOrders(r, user.ID, logger.Log)
-	switch status {
-	case http.StatusInternalServerError:
-		defaultReactionToInternalServerError(w, logger.Log, err)
-		return
-	case http.StatusNoContent:
+	if balanceData.Current < withdraw.Sum {
 		w.WriteHeader(http.StatusPaymentRequired)
 		return
 	}
 
-	balance, err := database.GetBalance(user.ID, orders)
-	if err != nil {
-		defaultReactionToInternalServerError(w, logger.Log, err)
-		return
-	}
+	err = database.DB.WithinTransaction(
+		r.Context(),
+		func(ctx context.Context) error {
+			return database.CreateWithdrawAndUpdateBalance(r.Context(), userID, withdraw.Order, withdraw.Sum)
+		},
+	)
 
-	if balance.Current < withdraw.Sum {
-		w.WriteHeader(http.StatusPaymentRequired)
-		return
-	}
-
-	newWithdraw := database.Withdraw{Order: withdraw.Order, Sum: withdraw.Sum}
-	err = createWithdrawAndUpdateBalance(&user, newWithdraw)
 	if err != nil {
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return
@@ -105,41 +62,23 @@ func RequestWithdrawAPIHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetBalanceAPIHandler(w http.ResponseWriter, r *http.Request) {
-	var user database.User
-	user, err := fillUserByRequestWithToken(r)
+	userID := auth.GetUserIDFromRequest(r)
+
+	balanceData, err := database.GetBalanceDataByUserID(r.Context(), userID)
 	if err != nil {
 		defaultReactionToInternalServerError(w, logger.Log, err)
 		return
 	}
 
-	orders, status, err := database.GetUserOrders(r, user.ID, logger.Log)
-	if status == http.StatusInternalServerError {
-		defaultReactionToInternalServerError(w, logger.Log, err)
-		return
-	}
-
-	balance, err := database.GetBalance(user.ID, orders)
-	if err != nil {
-		defaultReactionToInternalServerError(w, logger.Log, err)
-		return
-	}
-
-	writeResponseData(w, logger.Log, balance)
+	writeResponseData(w, logger.Log, balanceData)
 }
 
 func ListWithdrawalsAPIHandler(w http.ResponseWriter, r *http.Request) {
-	var user database.User
-	user, err := fillUserByRequestWithToken(r)
+	userID := auth.GetUserIDFromRequest(r)
+
+	withdrawals, err := database.GetUserWithdrawals(r.Context(), userID)
 	if err != nil {
 		defaultReactionToInternalServerError(w, logger.Log, err)
-		return
-	}
-
-	var withdrawals []database.Withdraw
-	filter := database.Order{UserID: user.ID}
-	if res := database.DB.Where(&filter).Find(&withdrawals); res.Error != nil {
-		defaultReactionToInternalServerError(w, logger.Log, err)
-		return
 	}
 
 	if len(withdrawals) == 0 {
