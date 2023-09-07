@@ -76,7 +76,14 @@ func UpdateOrders(ctx context.Context) error {
 		}
 	}
 
-	if err := updateOrdersAndBalances(ctx, ordersToUpdate, ordersWithAccrual); err != nil {
+	err := database.DB.WithinTransaction(
+		ctx,
+		func(ctx context.Context) error {
+			return updateOrdersAndBalances(ctx, ordersToUpdate, ordersWithAccrual)
+		},
+	)
+
+	if err != nil {
 		logger.Log.Error("error while updating orders and balances", zap.Error(err))
 		return err
 	}

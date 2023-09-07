@@ -16,7 +16,7 @@ func UpdateOrdersInBackground() {
 	for {
 		<-ticker.C
 		logger.Log.Debug("Updating orders")
-		if err := database.DB.WithinTransaction(ctx, UpdateOrders); err != nil {
+		if err := UpdateOrders(ctx); err != nil {
 			logger.Log.Errorf("error occured while updating orders", zap.Error(err))
 		}
 		logger.Log.Debug("Updated orders")
