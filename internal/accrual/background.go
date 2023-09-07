@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/baby-platom/loyalty-system/internal/database"
 	"github.com/baby-platom/loyalty-system/internal/logger"
 	"go.uber.org/zap"
 )
